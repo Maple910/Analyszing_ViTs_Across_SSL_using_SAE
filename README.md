@@ -1,1 +1,3 @@
 # Steering_MAE_CelebA
+
+CelebA画像データセットから金髪の特徴を抽出してみようのやつ
