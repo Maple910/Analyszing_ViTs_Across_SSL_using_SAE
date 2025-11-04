@@ -7,6 +7,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 import random
+import config_celeba
 
 # 再現性のためのシード設定 (既存のdata_loader.pyから継承)
 def set_seed(seed):
@@ -25,7 +26,7 @@ class CelebAAttributeDataset(Dataset):
         
         # 1. 属性ファイルの読み込み
         # ファイル名をインデックスとして使用
-        df = pd.read_csv(attr_path, delim_whitespace=True, skiprows=1)
+        df = pd.read_csv(attr_path, sep='\s+', skiprows=1)
         
         if target_attribute not in df.columns:
             raise ValueError(f"Attribute '{target_attribute}' not found.")
@@ -69,33 +70,33 @@ def get_celeba_attribute_loaders(img_dir, attr_path, batch_size, random_seed, nu
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
     
-    # 金髪 (Blond Hair == 1) データセット
-    dataset_blond = CelebAAttributeDataset(
+    # 1. 属性あり (Positive: value = 1) データローダー
+    dataset_attr = CelebAAttributeDataset(
         img_dir=img_dir, 
         attr_path=attr_path, 
         transform=transform, 
-        target_attribute='Blond_Hair', 
+        target_attribute=config_celeba.TARGET_ATTRIBUTE, 
         target_value=1,
         sample_size=num_images_to_sample,
         random_seed=random_seed
     )
 
-    # 非金髪 (Blond Hair == -1) データセット
-    dataset_non_blond = CelebAAttributeDataset(
+    # 2. 属性なし (Negative: value = -1) データローダー
+    dataset_non_attr = CelebAAttributeDataset(
         img_dir=img_dir, 
         attr_path=attr_path, 
         transform=transform, 
-        target_attribute='Blond_Hair', 
+        target_attribute=config_celeba.TARGET_ATTRIBUTE, 
         target_value=-1,
         sample_size=num_images_to_sample,
         random_seed=random_seed
     )
 
     # データセットサイズを確認し、一致しているか警告
-    if len(dataset_blond) != len(dataset_non_blond):
-        print(f"Warning: Dataset sizes are unequal (Blond: {len(dataset_blond)}, NonBlond: {len(dataset_non_blond)}).")
+    if len(dataset_attr) != len(dataset_non_attr):
+        print(f"Warning: Dataset sizes are unequal ({config_celeba.TARGET_ATTRIBUTE} True: {len(dataset_attr)}, False: {len(dataset_non_attr)}).")
         
-    dataloader_blond = DataLoader(dataset_blond, batch_size=batch_size, shuffle=False, num_workers=4)
-    dataloader_non_blond = DataLoader(dataset_non_blond, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataloader_attr = DataLoader(dataset_attr, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataloader_non_attr = DataLoader(dataset_non_attr, batch_size=batch_size, shuffle=False, num_workers=4)
 
-    return dataloader_blond, dataloader_non_blond
+    return dataloader_attr, dataloader_non_attr

@@ -1,4 +1,4 @@
-# compare_blond_feature.py (最終版: MAEニューロンを差分で特定)
+# compare_attribute_feature.py (最終版: MAEニューロンを差分で特定)
 
 import torch
 import timm
@@ -70,7 +70,7 @@ def collect_avg_activations(dataloader, layer_idx, vit_model, sae_model, target_
             
     return sum_activations / patch_count
 
-def compare_blond_feature(layer_idx, num_images_to_visualize=16):
+def compare_attribute_feature(layer_idx, num_images_to_visualize=16):
     os.makedirs(ANALYSIS_PATH, exist_ok=True)
     sae_weight_path = SAE_WEIGHTS_PATH_TEMPLATE.format(layer_idx=layer_idx)
     if not os.path.exists(sae_weight_path):
@@ -85,7 +85,7 @@ def compare_blond_feature(layer_idx, num_images_to_visualize=16):
     vit_model.eval()
     sae_model.eval()
 
-    dataloader_blond, dataloader_non_blond = get_celeba_attribute_loaders(
+    dataloader_attr, dataloader_non_attr = get_celeba_attribute_loaders(
         CELEBA_IMG_DIR, CELEBA_ATTR_PATH, BATCH_SIZE, RANDOM_SEED, NUM_IMAGES_TO_SAMPLE
     )
     transform_viz = transforms.Compose([
@@ -97,21 +97,21 @@ def compare_blond_feature(layer_idx, num_images_to_visualize=16):
     dataset_full = FullCelebADatasetForViz(CELEBA_IMG_DIR, CELEBA_ATTR_PATH, transform_viz)
     dataloader_full = DataLoader(dataset_full, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
     
-    print(f"--- 4. Identifying Blond Feature in Layer {layer_idx} ---")
-    avg_activations_sae_blond = collect_avg_activations(dataloader_blond, layer_idx, vit_model, sae_model, 'SAE')
-    avg_activations_sae_non_blond = collect_avg_activations(dataloader_non_blond, layer_idx, vit_model, sae_model, 'SAE')
-    diff_score_sae = avg_activations_sae_blond - avg_activations_sae_non_blond
+    print(f"--- 4. Identifying SAE Feature in Layer {layer_idx} ---")
+    avg_activations_sae_attr = collect_avg_activations(dataloader_attr, layer_idx, vit_model, sae_model, 'SAE')
+    avg_activations_sae_non_attr = collect_avg_activations(dataloader_non_attr, layer_idx, vit_model, sae_model, 'SAE')
+    diff_score_sae = avg_activations_sae_attr - avg_activations_sae_non_attr
     top_scores_sae, top_indices_sae = torch.topk(diff_score_sae, k=1, dim=0)
-    blond_feature_idx = top_indices_sae[0].item()
-    print(f"🥇 Identified Blond-Specific SAE Feature: ID {blond_feature_idx} (Score: {top_scores_sae[0].item():.6f})")
+    attr_feature_idx = top_indices_sae[0].item()
+    print(f"🥇 Identified Specific SAE Feature: ID {attr_feature_idx} (Score: {top_scores_sae[0].item():.6f})")
 
-    print("--- 5. Identifying Blond MAE Neuron by Activation Difference ---")
-    avg_activations_mae_blond = collect_avg_activations(dataloader_blond, layer_idx, vit_model, sae_model, 'MAE')
-    avg_activations_mae_non_blond = collect_avg_activations(dataloader_non_blond, layer_idx, vit_model, sae_model, 'MAE')
-    diff_score_mae = avg_activations_mae_blond - avg_activations_mae_non_blond
+    print("--- 5. Identifying attribute MAE Neuron by Activation Difference ---")
+    avg_activations_mae_attr = collect_avg_activations(dataloader_attr, layer_idx, vit_model, sae_model, 'MAE')
+    avg_activations_mae_non_attr = collect_avg_activations(dataloader_non_attr, layer_idx, vit_model, sae_model, 'MAE')
+    diff_score_mae = avg_activations_mae_attr - avg_activations_mae_non_attr
     top_scores_mae, top_indices_mae = torch.topk(diff_score_mae, k=1, dim=0)
     mae_neuron_idx = top_indices_mae[0].item()
-    print(f"🥇 Identified Blond-Specific MAE Neuron: ID {mae_neuron_idx} (Score: {top_scores_mae[0].item():.6f})")
+    print(f"🥇 Identified Specific MAE Neuron: ID {mae_neuron_idx} (Score: {top_scores_mae[0].item():.6f})")
 
     all_activations_neuron = []
     all_activations_sae = []
@@ -139,7 +139,7 @@ def compare_blond_feature(layer_idx, num_images_to_visualize=16):
             layer_output = activations[f"layer_{layer_idx}_fc2"].view(-1, D_MODEL)
             _, sae_features = sae_model(layer_output)
             sae_features = sae_features.view(images.shape[0], -1, D_SAE)
-            max_act_sae, _ = torch.max(sae_features[:, :, blond_feature_idx], dim=1)
+            max_act_sae, _ = torch.max(sae_features[:, :, attr_feature_idx], dim=1)
             all_activations_sae.append(max_act_sae.cpu())
             
             all_image_paths.extend(paths)
@@ -173,16 +173,16 @@ def compare_blond_feature(layer_idx, num_images_to_visualize=16):
         image = Image.open(img_path).convert('RGB')
         image_transformed = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224)])(image)
         axes[i + k_half].imshow(image_transformed)
-        axes[i + k_half].set_title(f"SAE (F{blond_feature_idx})", fontsize=8)
+        axes[i + k_half].set_title(f"SAE (F{attr_feature_idx})", fontsize=8)
         axes[i + k_half].axis('off')
 
     for j in range(k, len(axes)):
         axes[j].axis('off')
 
-    fig.suptitle(f"Layer {layer_idx} Comparison: MAE Neuron {mae_neuron_idx} vs. Blond Feature {blond_feature_idx}")
+    fig.suptitle(f"Layer {layer_idx} Comparison: MAE Neuron {mae_neuron_idx} vs. SAE Feature {attr_feature_idx}")
     plt.tight_layout()
 
-    save_path = os.path.join(ANALYSIS_PATH, f"blond_comparison_Layer_{layer_idx}.png")
+    save_path = os.path.join(ANALYSIS_PATH, f"{TARGET_ATTRIBUTE}_comparison_Layer_{layer_idx}.png")
     plt.savefig(save_path)
     print(f"\nVisualization saved to {save_path}")
     plt.close('all')
@@ -190,4 +190,4 @@ def compare_blond_feature(layer_idx, num_images_to_visualize=16):
 if __name__ == "__main__":
     for layer in range(12):
         print(f"\n=== Analyzing Layer {layer} ===")
-        compare_blond_feature(layer, NUM_IMAGES_TO_VISUALIZE)
+        compare_attribute_feature(layer, NUM_IMAGES_TO_VISUALIZE)

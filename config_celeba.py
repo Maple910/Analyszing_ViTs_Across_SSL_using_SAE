@@ -22,8 +22,8 @@ EPOCHS = 2
 
 # --- CelebA データセットパス ---
 #                      画像データ                                                                      属性情報
-# ./../Steering_MAE(CelebA)/img_aligin_celeba/img_align_celeba_data, ./../Steering_MAE(CelebA)img_aligin_celeba/list_attr_celeba.txt
-CELEBA_BASE_DIR = "./../Steering_MAE(CelebA)/img_align_celeba"
+# ./../Steering_MAE_CelebA_Data/img_aligin_celeba/img_align_celeba_data, ./../Steering_MAE_CelebA_Data/img_aligin_celeba/list_attr_celeba.txt
+CELEBA_BASE_DIR = "./../Steering_MAE_CelebA_Data/img_align_celeba"
 CELEBA_IMG_DIR = os.path.join(CELEBA_BASE_DIR, "img_align_celeba_data")
 CELEBA_ATTR_PATH = os.path.join(CELEBA_BASE_DIR, "list_attr_celeba.txt")
 
@@ -32,13 +32,16 @@ LAYER_TO_ANALYZE = 5
 NUM_IMAGES_TO_SAMPLE = 5000 
 NUM_IMAGES_TO_VISUALIZE = 10 # <----可視化枚数
 
+# --- 分析ターゲット設定 ---
+TARGET_ATTRIBUTE = "Eyeglasses" # <--- 分析したい属性名を設定 (例: "Smiling", "Male")
+
 # --- SAE重みのパス ---
-SAE_WEIGHTS_DIR = "./../Steering_MAE(CelebA)/sae_weights_celeba_run_3" # <--- 修正: CelebA訓練用の新しいディレクトリ名
+SAE_WEIGHTS_DIR = "./../Steering_MAE_CelebA_Data/sae_weights_celeba_run_3" # <--- 修正: CelebA訓練用の新しいディレクトリ名
 SAE_WEIGHTS_PATH_TEMPLATE = os.path.join(SAE_WEIGHTS_DIR, "sae_layer_{layer_idx}.pth")
 
 # --- 結果の保存先 ---
-ANALYSIS_SAVE_DIR = "celeba_blond_analysis/sae_weights_celeba_run_3"
-ANALYSIS_PATH = os.path.join("./../Steering_MAE(CelebA)", ANALYSIS_SAVE_DIR)
+ANALYSIS_SAVE_DIR = f"analysis_results_{TARGET_ATTRIBUTE}/sae_weights_celeba_run_3"
+ANALYSIS_PATH = os.path.join("./../Steering_MAE_CelebA_Data", ANALYSIS_SAVE_DIR)
 
 # --- Weights & Biases (wandb) 設定 ---
 WANDB_PROJECT_NAME = "MAE_SAE_Steering_CelebA" # <--- 追加: wandbプロジェクト名

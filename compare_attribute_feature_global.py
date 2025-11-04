@@ -25,7 +25,7 @@ def get_activation(name, activations):
 # 全てのCelebA画像から活性化を収集するためのデータセット (既存の FullCelebADatasetForViz と同じ)
 class FullCelebADatasetForViz(Dataset):
     def __init__(self, img_dir, attr_path, transform):
-        df = pd.read_csv(attr_path, delim_whitespace=True, skiprows=1)
+        df = pd.read_csv(attr_path, sep='\s+', skiprows=1)
         self.image_paths = [os.path.join(img_dir, filename) for filename in df.index]
         self.transform = transform
         
@@ -76,14 +76,14 @@ def collect_avg_activations(dataloader, layer_idx, vit_model, sae_model, target_
     return sum_activations / patch_count
 
 
-def compare_global_best_blond(num_images_to_visualize=16):
+def compare_global_best_atrtribute(num_images_to_visualize=16):
     
     # 1. パスの設定とモデル初期化
     os.makedirs(ANALYSIS_PATH, exist_ok=True)
     vit_model = timm.create_model("vit_base_patch16_224", pretrained=True).to(DEVICE)
     vit_model.eval()
     
-    dataloader_blond, dataloader_non_blond = get_celeba_attribute_loaders(
+    dataloader_attr, dataloader_non_attr = get_celeba_attribute_loaders(
         CELEBA_IMG_DIR, CELEBA_ATTR_PATH, BATCH_SIZE, RANDOM_SEED, NUM_IMAGES_TO_SAMPLE
     )
     
@@ -105,18 +105,18 @@ def compare_global_best_blond(num_images_to_visualize=16):
         sae_model.eval()
 
         # 4. SAE特徴の特定
-        avg_activations_sae_blond = collect_avg_activations(dataloader_blond, layer_idx, vit_model, sae_model, 'SAE')
-        avg_activations_sae_non_blond = collect_avg_activations(dataloader_non_blond, layer_idx, vit_model, sae_model, 'SAE')
-        diff_score_sae = avg_activations_sae_blond - avg_activations_sae_non_blond
+        avg_activations_sae_attr = collect_avg_activations(dataloader_attr, layer_idx, vit_model, sae_model, 'SAE')
+        avg_activations_sae_non_attr = collect_avg_activations(dataloader_non_attr, layer_idx, vit_model, sae_model, 'SAE')
+        diff_score_sae = avg_activations_sae_attr - avg_activations_sae_non_attr
         
         # トップ1の特徴のスコアとインデックスを取得
         max_score_sae, max_idx_sae = torch.max(diff_score_sae, dim=0)
         global_scores_sae.append((max_score_sae.item(), layer_idx, max_idx_sae.item()))
 
         # 5. MAEニューロンの特定
-        avg_activations_mae_blond = collect_avg_activations(dataloader_blond, layer_idx, vit_model, sae_model, 'MAE')
-        avg_activations_mae_non_blond = collect_avg_activations(dataloader_non_blond, layer_idx, vit_model, sae_model, 'MAE')
-        diff_score_mae = avg_activations_mae_blond - avg_activations_mae_non_blond
+        avg_activations_mae_attr = collect_avg_activations(dataloader_attr, layer_idx, vit_model, sae_model, 'MAE')
+        avg_activations_mae_non_attr = collect_avg_activations(dataloader_non_attr, layer_idx, vit_model, sae_model, 'MAE')
+        diff_score_mae = avg_activations_mae_attr - avg_activations_mae_non_attr
         
         max_score_mae, max_idx_mae = torch.max(diff_score_mae, dim=0)
         global_scores_mae.append((max_score_mae.item(), layer_idx, max_idx_mae.item()))
@@ -134,13 +134,13 @@ def compare_global_best_blond(num_images_to_visualize=16):
     best_mae = max(global_scores_mae, key=lambda x: x[0])
 
     # グローバルトップの特徴パラメータ
-    blond_feature_layer = best_sae[1]
-    blond_feature_idx = best_sae[2]
+    best_sae_feature_layer = best_sae[1]
+    best_sae_feature_idx = best_sae[2]
     mae_neuron_layer = best_mae[1]
     mae_neuron_idx = best_mae[2]
     
     print("\n" + "="*50)
-    print(f"✨ GLOBAL BEST SAE FEATURE: Layer {blond_feature_layer}, ID {blond_feature_idx} (Score: {best_sae[0]:.6f})")
+    print(f"✨ GLOBAL BEST SAE FEATURE: Layer {best_sae_feature_layer}, ID {best_sae_feature_idx} (Score: {best_sae[0]:.6f})")
     print(f"✨ GLOBAL BEST MAE NEURON: Layer {mae_neuron_layer}, ID {mae_neuron_idx} (Score: {best_mae[0]:.6f})")
     print("="*50)
 
@@ -149,7 +149,7 @@ def compare_global_best_blond(num_images_to_visualize=16):
     
     # MAEの可視化に必要なSAEモデルをロード (MAEとSAEは異なる層かもしれないため)
     sae_model_sae_viz = SparseAutoencoder(D_MODEL, D_SAE, L1_COEFF).to(DEVICE)
-    sae_model_sae_viz.load_state_dict(torch.load(SAE_WEIGHTS_PATH_TEMPLATE.format(layer_idx=blond_feature_layer), map_location=DEVICE))
+    sae_model_sae_viz.load_state_dict(torch.load(SAE_WEIGHTS_PATH_TEMPLATE.format(layer_idx=best_sae_feature_layer), map_location=DEVICE))
     sae_model_sae_viz.eval()
     
     # 可視化用のデータローダー (全画像)
@@ -174,8 +174,8 @@ def compare_global_best_blond(num_images_to_visualize=16):
             activations_mae = {}
             
             # SAEの活性化を収集
-            hook_handle_sae_fc1 = vit_model.blocks[blond_feature_layer].mlp.fc1.register_forward_hook(get_activation("sae_fc1", activations_sae))
-            hook_handle_sae_fc2 = vit_model.blocks[blond_feature_layer].mlp.fc2.register_forward_hook(get_activation("sae_fc2", activations_sae))
+            hook_handle_sae_fc1 = vit_model.blocks[best_sae_feature_layer].mlp.fc1.register_forward_hook(get_activation("sae_fc1", activations_sae))
+            hook_handle_sae_fc2 = vit_model.blocks[best_sae_feature_layer].mlp.fc2.register_forward_hook(get_activation("sae_fc2", activations_sae))
             
             # MAEの活性化を収集
             hook_handle_mae_fc1 = vit_model.blocks[mae_neuron_layer].mlp.fc1.register_forward_hook(get_activation("mae_fc1", activations_mae))
@@ -191,7 +191,7 @@ def compare_global_best_blond(num_images_to_visualize=16):
             sae_output = activations_sae["sae_fc2"].view(-1, D_MODEL) 
             _, sae_features = sae_model_sae_viz(sae_output)
             sae_features = sae_features.view(images.shape[0], -1, D_SAE)
-            max_act_sae, _ = torch.max(sae_features[:, :, blond_feature_idx], dim=1)
+            max_act_sae, _ = torch.max(sae_features[:, :, best_sae_feature_idx], dim=1)
             all_activations_sae.append(max_act_sae.cpu())
             
             # MAE Neuronの活性化 (MAEのベスト層を使用)
@@ -236,20 +236,20 @@ def compare_global_best_blond(num_images_to_visualize=16):
         image = Image.open(img_path).convert('RGB')
         image_transformed = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224)])(image)
         axes[i + k_half].imshow(image_transformed)
-        axes[i + k_half].set_title(f"SAE (L{blond_feature_layer} F{blond_feature_idx})", fontsize=8)
+        axes[i + k_half].set_title(f"SAE (L{best_sae_feature_layer} F{best_sae_feature_idx})", fontsize=8)
         axes[i + k_half].axis('off')
 
     # 余った軸は非表示にする
     for j in range(k, len(axes)):
         axes[j].axis('off')
 
-    fig.suptitle(f"Global Best Blond Feature Comparison: MAE L{mae_neuron_layer} N{mae_neuron_idx} vs. SAE L{blond_feature_layer} F{blond_feature_idx}")
+    fig.suptitle(f"Global Best {TARGET_ATTRIBUTE} Feature Comparison: MAE L{mae_neuron_layer} N{mae_neuron_idx} vs. SAE L{best_sae_feature_layer} F{best_sae_feature_idx}")
     plt.tight_layout()
 
-    save_path = os.path.join(ANALYSIS_PATH, f"global_best_blond_comparison.png")
+    save_path = os.path.join(ANALYSIS_PATH, f"global_best_{TARGET_ATTRIBUTE}_comparison.png")
     plt.savefig(save_path)
     print(f"\nVisualization saved to {save_path}")
     plt.close('all')
 
 if __name__ == "__main__":
-    compare_global_best_blond(NUM_IMAGES_TO_VISUALIZE)
+    compare_global_best_atrtribute(NUM_IMAGES_TO_VISUALIZE)
