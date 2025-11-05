@@ -246,10 +246,24 @@ def compare_global_best_atrtribute(num_images_to_visualize=16):
     fig.suptitle(f"Global Best {TARGET_ATTRIBUTE} Feature Comparison: MAE L{mae_neuron_layer} N{mae_neuron_idx} vs. SAE L{best_sae_feature_layer} F{best_sae_feature_idx}")
     plt.tight_layout()
 
+    # 可視化の保存
     save_path = os.path.join(ANALYSIS_PATH, f"global_best_{TARGET_ATTRIBUTE}_comparison.png")
     plt.savefig(save_path)
     print(f"\nVisualization saved to {save_path}")
     plt.close('all')
+
+    # スコア情報をテキストファイルとして保存
+    score_path = os.path.join(ANALYSIS_PATH, f"global_best_{TARGET_ATTRIBUTE}_scores.txt")
+    with open(score_path, 'w') as f:
+        f.write("--- Global Score Calculation Across All 12 Layers ---\n")
+        for score_sae, score_mae in zip(global_scores_sae, global_scores_mae):
+            f.write(f"Layer {score_sae[1]}: SAE Max Score={score_sae[0]:.6f}, MAE Max Score={score_mae[0]:.6f}\n")
+        
+        f.write("\n" + "="*50 + "\n")
+        f.write(f"✨ GLOBAL BEST SAE FEATURE: Layer {best_sae_feature_layer}, ID {best_sae_feature_idx} (Score: {best_sae[0]:.6f})\n")
+        f.write(f"✨ GLOBAL BEST MAE NEURON: Layer {mae_neuron_layer}, ID {mae_neuron_idx} (Score: {best_mae[0]:.6f})\n")
+        f.write("="*50 + "\n")
+    print(f"Scores saved to {score_path}")
 
 if __name__ == "__main__":
     compare_global_best_atrtribute(NUM_IMAGES_TO_VISUALIZE)

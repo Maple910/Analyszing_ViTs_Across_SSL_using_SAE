@@ -33,7 +33,7 @@ NUM_IMAGES_TO_SAMPLE = 5000
 NUM_IMAGES_TO_VISUALIZE = 10 # <----可視化枚数
 
 # --- 分析ターゲット設定 ---
-TARGET_ATTRIBUTE = "Eyeglasses" # <--- 分析したい属性名を設定 (例: "Smiling", "Male")
+TARGET_ATTRIBUTE = "Male" # <--- 分析したい属性名を設定 (例: "Smiling", "Male")
 
 # --- SAE重みのパス ---
 SAE_WEIGHTS_DIR = "./../Steering_MAE_CelebA_Data/sae_weights_celeba_run_3" # <--- 修正: CelebA訓練用の新しいディレクトリ名
