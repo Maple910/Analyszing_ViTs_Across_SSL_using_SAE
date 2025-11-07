@@ -28,12 +28,13 @@ CELEBA_IMG_DIR = os.path.join(CELEBA_BASE_DIR, "img_align_celeba_data")
 CELEBA_ATTR_PATH = os.path.join(CELEBA_BASE_DIR, "list_attr_celeba.txt")
 
 # --- 分析設定 ---
-LAYER_TO_ANALYZE = 5 
+LAYER_TO_ANALYZE = 10
+K_TOP_UNITS = 1
 NUM_IMAGES_TO_SAMPLE = 5000 
-NUM_IMAGES_TO_VISUALIZE = 10 # <----可視化枚数
+NUM_IMAGES_TO_VISUALIZE = 9 # <----可視化枚数
 
 # --- 分析ターゲット設定 ---
-TARGET_ATTRIBUTE = "Male" # <--- 分析したい属性名を設定 (例: "Smiling", "Male")
+TARGET_ATTRIBUTE = "Blond_Hair" # <--- 分析したい属性名を設定 (例: "Smiling", "Male")
 
 # --- SAE重みのパス ---
 SAE_WEIGHTS_DIR = "./../Steering_MAE_CelebA_Data/sae_weights_celeba_run_3" # <--- 修正: CelebA訓練用の新しいディレクトリ名

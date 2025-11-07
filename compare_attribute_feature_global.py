@@ -15,6 +15,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from glob import glob
+from math import ceil
 
 # Hook関数 (再定義: MAE活性化取得用)
 def get_activation(name, activations):
@@ -206,42 +207,55 @@ def compare_global_best_atrtribute(num_images_to_visualize=16):
     all_activations_mae_tensor = torch.cat(all_activations_mae, dim=0)
     
     total_images = all_activations_sae_tensor.size(0)
-    k = min(num_images_to_visualize, total_images)
+    k_viz = min(num_images_to_visualize, total_images)
 
-    _, top_idx_sae = torch.topk(all_activations_sae_tensor, k=k)
-    _, top_idx_mae = torch.topk(all_activations_mae_tensor, k=k)
-
+    _, top_idx_sae = torch.topk(all_activations_sae_tensor, k=k_viz)
+    _, top_idx_mae = torch.topk(all_activations_mae_tensor, k=k_viz)
 
     # 4. 比較可視化
-    ncols = int(np.ceil(k / 4.0))
-    fig, axes = plt.subplots(4, ncols, figsize=(15, 12))
+    cols = 3
+    rows_per_unit = int(ceil(k_viz / cols))
+    total_rows = rows_per_unit * 2
+
+    fig, axes = plt.subplots(total_rows, cols, figsize=(10, total_rows * 5)) # グリッドサイズを動的に設定
     axes = axes.flatten()
     print("--- 4. Generating Global Comparison Grid ---")
-    k_half = k // 2
+    
+    total_plots = total_rows * cols # グリッド総枠数
 
     # 上半分: MAE Neuron のトップ画像
-    for i in range(k_half):
+    for i in range(k_viz):
         global_idx = top_idx_mae[i].item()
         img_path = all_image_paths[global_idx]
         image = Image.open(img_path).convert('RGB')
+
         image_transformed = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224)])(image)
         axes[i].imshow(image_transformed)
         axes[i].set_title(f"MAE (L{mae_neuron_layer} N{mae_neuron_idx})", fontsize=8)
         axes[i].axis('off')
 
     # 下半分: SAE Feature のトップ画像
-    for i in range(k_half):
+    for i in range(k_viz):
         global_idx = top_idx_sae[i].item()
         img_path = all_image_paths[global_idx]
         image = Image.open(img_path).convert('RGB')
+
+        # 配置開始位置
+        ax_idx = i + (rows_per_unit * cols)
+
         image_transformed = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224)])(image)
-        axes[i + k_half].imshow(image_transformed)
-        axes[i + k_half].set_title(f"SAE (L{best_sae_feature_layer} F{best_sae_feature_idx})", fontsize=8)
-        axes[i + k_half].axis('off')
+        axes[ax_idx].imshow(image_transformed)
+        axes[ax_idx].set_title(f"SAE (L{best_sae_feature_layer} F{best_sae_feature_idx})", fontsize=8)
+        axes[ax_idx].axis('off')
 
     # 余った軸は非表示にする
-    for j in range(k, len(axes)):
+    for j in range(k_viz, rows_per_unit * cols):
         axes[j].axis('off')
+
+    # SAEの末尾 (k_viz から rows_per_unit * cols まで)
+    # SAEの開始インデックスを考慮
+    for j in range(k_viz, rows_per_unit * cols):
+        axes[j + (rows_per_unit * cols)].axis('off')
 
     fig.suptitle(f"Global Best {TARGET_ATTRIBUTE} Feature Comparison: MAE L{mae_neuron_layer} N{mae_neuron_idx} vs. SAE L{best_sae_feature_layer} F{best_sae_feature_idx}")
     plt.tight_layout()
@@ -260,8 +274,8 @@ def compare_global_best_atrtribute(num_images_to_visualize=16):
             f.write(f"Layer {score_sae[1]}: SAE Max Score={score_sae[0]:.6f}, MAE Max Score={score_mae[0]:.6f}\n")
         
         f.write("\n" + "="*50 + "\n")
-        f.write(f"✨ GLOBAL BEST SAE FEATURE: Layer {best_sae_feature_layer}, ID {best_sae_feature_idx} (Score: {best_sae[0]:.6f})\n")
-        f.write(f"✨ GLOBAL BEST MAE NEURON: Layer {mae_neuron_layer}, ID {mae_neuron_idx} (Score: {best_mae[0]:.6f})\n")
+        f.write(f"GLOBAL BEST SAE FEATURE: Layer {best_sae_feature_layer}, ID {best_sae_feature_idx} (Score: {best_sae[0]:.6f})\n")
+        f.write(f"GLOBAL BEST MAE NEURON: Layer {mae_neuron_layer}, ID {mae_neuron_idx} (Score: {best_mae[0]:.6f})\n")
         f.write("="*50 + "\n")
     print(f"Scores saved to {score_path}")
 
