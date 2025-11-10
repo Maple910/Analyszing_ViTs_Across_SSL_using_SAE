@@ -1,4 +1,4 @@
-# compare_global_best_blond.py
+# 全層からTop-1を特定，可視化
 
 import torch
 import timm
@@ -17,13 +17,12 @@ import pandas as pd
 from glob import glob
 from math import ceil
 
-# Hook関数 (再定義: MAE活性化取得用)
 def get_activation(name, activations):
     def hook(model, input, output):
         activations[name] = output.detach()
     return hook
 
-# 全てのCelebA画像から活性化を収集するためのデータセット (既存の FullCelebADatasetForViz と同じ)
+# 全てのCelebA画像から活性化を収集するためのデータセット
 class FullCelebADatasetForViz(Dataset):
     def __init__(self, img_dir, attr_path, transform):
         df = pd.read_csv(attr_path, sep='\s+', skiprows=1)
@@ -44,7 +43,7 @@ class FullCelebADatasetForViz(Dataset):
             
         return image_tensor, img_path 
 
-# MAE/SAEの平均活性化を収集するユーティリティ関数 (既存の collect_avg_activations と同じ)
+# MAE/SAEの平均活性化を収集するユーティリティ関数 
 def collect_avg_activations(dataloader, layer_idx, vit_model, sae_model, target_type):
     D_MLP = D_MODEL * 4
     sum_activations = torch.zeros(D_SAE if target_type == 'SAE' else D_MLP).to(DEVICE)

@@ -16,17 +16,13 @@ class SparseAutoencoder(nn.Module):
         nn.init.xavier_normal_(self.decoder.weight)
         self.encoder.weight.data = self.decoder.weight.data.T
 
-        # 必要なら encoder.bias を小さく初期化して ReLU 系の崩壊を緩和
         if init_encoder_bias is not None:
             self.encoder.bias.data.fill_(float(init_encoder_bias))
  
     def forward(self, x):
-        """
-        Production forward: デバッグ出力やバイパス引数なしのシンプル実装
-        """
         x_centered = x - self.bias  # (N, d_model)
         pre_act = self.encoder(x_centered)  # (N, d_sae)
-        # shrink を使わない設定：そのままの encoder 出力を SAE 特徴とする
+        
         sae_features = pre_act
         reconstruction = self.decoder(sae_features) + self.bias
         return reconstruction, sae_features
@@ -34,6 +30,5 @@ class SparseAutoencoder(nn.Module):
     def get_loss(self, x):
         reconstruction, sae_features = self.forward(x)
         reconstruction_loss = F.mse_loss(reconstruction, x)
-        # L1 正則化は絶対値で計算（符号打ち消しを防ぐ）
         l1_loss = self.l1_coeff * torch.sum(torch.abs(sae_features)) / sae_features.shape[0]
         return reconstruction_loss, l1_loss

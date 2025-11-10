@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 import random
 import config_celeba
 
-# 再現性のためのシード設定 (既存のdata_loader.pyから継承)
+# 再現性のためのシード設定
 def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():

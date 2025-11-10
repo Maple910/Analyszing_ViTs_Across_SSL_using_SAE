@@ -1,20 +1,20 @@
-# train_sae_celeba.py (修正版：依存関係を解決)
+# 訓練
 
 import torch
 from torch import amp
 import timm
 import torch.nn.functional as F
 from tqdm import tqdm
-from sae_model import SparseAutoencoder # SparseAutoencoder
-from data_loader_celeba import get_celeba_attribute_loaders, set_seed, CelebAAttributeDataset # CelebA用データローダーから必要な関数をインポート
-from config_celeba import * # CelebA用の設定をインポート (config_celeba.py)
+from sae_model import SparseAutoencoder 
+from data_loader_celeba import get_celeba_attribute_loaders, set_seed, CelebAAttributeDataset 
+from config_celeba import * 
 import os
 import sys
 import wandb 
 import pandas as pd 
-from torch.utils.data import Dataset, DataLoader # <-- 追加：Dataset, DataLoader
-from PIL import Image # <-- 追加：Image
-import torchvision.transforms as transforms # <-- 追加：transforms
+from torch.utils.data import Dataset, DataLoader 
+from PIL import Image 
+import torchvision.transforms as transforms 
 
 # DataLoaderに必要なDatasetの最小構成（すべてのCelebA画像を含む）
 class FullCelebADataset(Dataset):
@@ -36,7 +36,6 @@ class FullCelebADataset(Dataset):
             image = self.transform(image)
         return image, label
 
-# Hook関数 (既存のsae_model.pyから継承)
 def get_activation(name, activations):
     def hook(model, input, output):
         activations[name] = output.detach()
@@ -50,7 +49,7 @@ def train_sae_celeba():
     full_dataset = pd.read_csv(CELEBA_ATTR_PATH, delim_whitespace=True, skiprows=1)
     all_image_paths = [os.path.join(CELEBA_IMG_DIR, filename) for filename in full_dataset.index]
     
-    # MAE/ViTモデルに適した標準的な前処理
+    # 前処理
     transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -74,7 +73,7 @@ def train_sae_celeba():
     vit_model = timm.create_model("vit_base_patch16_224", pretrained=True).to(DEVICE)
     vit_model.eval()
     
-    # wandbを初期化
+    # wandb初期化
     wandb.init(project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, name=f"SAE_CelebA_Train_{SAE_WEIGHTS_DIR}", config={
         "dataset": "CelebA",
         "d_model": D_MODEL,
@@ -90,11 +89,11 @@ def train_sae_celeba():
     for layer_idx in range(12):
         print(f"Training SAE for layer {layer_idx} on CelebA...")
         
-        # SAE を作成（shrink_lambda は廃止）
+        
         sae_model = SparseAutoencoder(D_MODEL, D_SAE, L1_COEFF).to(DEVICE)
         optimizer = torch.optim.Adam(sae_model.parameters(), lr=LEARNING_RATE)
         
-        # GradScaler の新 API を使用 ('cuda' を第1引数で指定)
+        
         scaler = amp.GradScaler("cuda")
         for epoch in range(EPOCHS):
             total_loss = 0

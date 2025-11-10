@@ -1,4 +1,4 @@
-# visualize_top_k_units_per_layer.py (修正版: ファイル名とスキップロジック)
+# config_celebaで指定したLAYER_TO_ANALYZE，K_TOP_UNITSを使って可視化
 
 import torch
 import timm
@@ -16,13 +16,13 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from math import ceil
 
-# Hook関数 (既存コードから変更なし)
+
 def get_activation(name, activations):
     def hook(model, input, output):
         activations[name] = output.detach()
     return hook
 
-# 全てのCelebA画像から活性化を収集するためのデータセット (既存コードから変更なし)
+# 全てのCelebA画像から活性化を収集するためのデータセット
 class FullCelebADatasetForViz(Dataset):
     def __init__(self, img_dir, attr_path, transform):
         df = pd.read_csv(attr_path, delim_whitespace=True, skiprows=1)
@@ -43,7 +43,7 @@ class FullCelebADatasetForViz(Dataset):
             
         return image_tensor, img_path 
 
-# MAE/SAEの平均活性化を収集するユーティリティ関数 (既存コードから変更なし)
+# MAE/SAEの平均活性化を収集するユーティリティ関数
 def collect_avg_activations(dataloader, layer_idx, vit_model, sae_model, target_type):
     D_MLP = D_MODEL * 4
     sum_activations = torch.zeros(D_SAE if target_type == 'SAE' else D_MLP).to(DEVICE)
@@ -78,12 +78,15 @@ def collect_avg_activations(dataloader, layer_idx, vit_model, sae_model, target_
 def visualize_single_unit(unit_type, layer_idx, unit_idx, rank, vit_model, sae_model, dataloader_full, num_images_to_visualize, save_dir):
     
     # 1. 保存パスの決定とスキップチェック
-    # ファイル名形式: L{layer}_MAE/SAE_U{unit_ID}_Rank{rank}.png
-    file_name = f"L{layer_idx}_{unit_type}_U{unit_idx}_Rank{rank}.png"
-    save_path = os.path.join(save_dir, file_name)
+    # save_dir の下に unit_type 名（'MAE' または 'SAE'）のサブディレクトリを作成して保存する
+    type_dir = os.path.join(save_dir, unit_type)
+    os.makedirs(type_dir, exist_ok=True)
+
+    file_name = f"L{layer_idx}_{unit_type}_Rank{rank:03d}_U{unit_idx}.png"
+    save_path = os.path.join(type_dir, file_name)
 
     if os.path.exists(save_path):
-        print(f"    -> Skipping {unit_type} Unit {unit_idx} (Rank {rank}): File already exists.")
+        print(f"    -> Skipping {unit_type} Unit {unit_idx} (Rank {rank:03d}): File already exists at {save_path}.")
         return
         
     all_activations = []
@@ -163,7 +166,6 @@ def visualize_single_unit(unit_type, layer_idx, unit_idx, rank, vit_model, sae_m
 def analyze_and_visualize_top_k(layer_idx, k_top_units, num_images_to_visualize):
     
     # 1. パスの設定とモデルロード
-    # analysis_layer_dir を ANALSYIS_PATH に変更
     os.makedirs(ANALYSIS_PATH, exist_ok=True) 
     save_dir = ANALYSIS_PATH # 保存ディレクトリを設定
 
@@ -243,7 +245,7 @@ if __name__ == "__main__":
         print(f"==========================================")
         analyze_and_visualize_top_k(layer, K_TOP_UNITS, NUM_IMAGES_TO_VISUALIZE)
     """
-    # 単層探索用
+    # 単層探索
     layer = LAYER_TO_ANALYZE  
     print(f"\n==========================================")
     print(f"STARTING ANALYSIS FOR LAYER {layer}")

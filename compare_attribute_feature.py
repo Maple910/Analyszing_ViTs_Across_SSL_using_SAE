@@ -1,4 +1,4 @@
-# compare_attribute_feature.py (最終版: MAEニューロンを差分で特定)
+# 各層でTop-1を特定，可視化
 
 import torch
 import timm
@@ -103,7 +103,7 @@ def compare_attribute_feature(layer_idx, num_images_to_visualize=16):
     diff_score_sae = avg_activations_sae_attr - avg_activations_sae_non_attr
     top_scores_sae, top_indices_sae = torch.topk(diff_score_sae, k=1, dim=0)
     attr_feature_idx = top_indices_sae[0].item()
-    print(f"🥇 Identified Specific SAE Feature: ID {attr_feature_idx} (Score: {top_scores_sae[0].item():.6f})")
+    print(f"Identified Specific SAE Feature: ID {attr_feature_idx} (Score: {top_scores_sae[0].item():.6f})")
 
     print("--- 5. Identifying attribute MAE Neuron by Activation Difference ---")
     avg_activations_mae_attr = collect_avg_activations(dataloader_attr, layer_idx, vit_model, sae_model, 'MAE')
@@ -111,7 +111,7 @@ def compare_attribute_feature(layer_idx, num_images_to_visualize=16):
     diff_score_mae = avg_activations_mae_attr - avg_activations_mae_non_attr
     top_scores_mae, top_indices_mae = torch.topk(diff_score_mae, k=1, dim=0)
     mae_neuron_idx = top_indices_mae[0].item()
-    print(f"🥇 Identified Specific MAE Neuron: ID {mae_neuron_idx} (Score: {top_scores_mae[0].item():.6f})")
+    print(f"Identified Specific MAE Neuron: ID {mae_neuron_idx} (Score: {top_scores_mae[0].item():.6f})")
 
     all_activations_neuron = []
     all_activations_sae = []
