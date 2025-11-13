@@ -23,7 +23,7 @@ class SparseAutoencoder(nn.Module):
         x_centered = x - self.bias  # (N, d_model)
         pre_act = self.encoder(x_centered)  # (N, d_sae)
         
-        sae_features = pre_act
+        sae_features = F.relu(pre_act)
         reconstruction = self.decoder(sae_features) + self.bias
         return reconstruction, sae_features
 
