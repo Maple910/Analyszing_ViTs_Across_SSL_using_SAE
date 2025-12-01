@@ -70,7 +70,7 @@ def train_sae_celeba():
         
     os.makedirs(sae_weights_path, exist_ok=True)
     
-    vit_model = timm.create_model("vit_base_patch16_224", pretrained=True).to(DEVICE)
+    vit_model = timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE)
     vit_model.eval()
     
     # wandb初期化
