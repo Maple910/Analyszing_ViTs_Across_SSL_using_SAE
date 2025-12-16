@@ -175,7 +175,7 @@ def analyze_and_visualize_top_k(layer_idx, k_top_units, num_images_to_visualize)
         print(f"Error: SAE weights not found at {sae_weight_path}. Skipping layer {layer_idx}.")
         return
 
-    vit_model = timm.create_model("vit_base_patch16_224", pretrained=True).to(DEVICE)
+    vit_model = timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE)
     sae_model = SparseAutoencoder(D_MODEL, D_SAE, L1_COEFF).to(DEVICE)
     sae_model.load_state_dict(torch.load(sae_weight_path, map_location=DEVICE))
     vit_model.eval()

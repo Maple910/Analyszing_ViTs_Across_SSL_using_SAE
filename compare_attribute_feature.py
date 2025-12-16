@@ -77,7 +77,7 @@ def compare_attribute_feature(layer_idx, num_images_to_visualize=16):
         print(f"Error: SAE weights not found at {sae_weight_path}. Check SAE_WEIGHTS_DIR in config_celeba.py.")
         return
 
-    vit_model = timm.create_model("vit_base_patch16_224", pretrained=True).to(DEVICE)
+    vit_model = timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE)
     
     sae_model = SparseAutoencoder(D_MODEL, D_SAE, L1_COEFF).to(DEVICE)
     sae_model.load_state_dict(torch.load(sae_weight_path, map_location=DEVICE))
