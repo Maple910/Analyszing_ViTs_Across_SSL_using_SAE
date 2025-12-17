@@ -158,8 +158,8 @@ def compare_global_best_attribute(num_images_to_visualize=16):
         global_scores_mae.append((best_score_mae, layer_idx, best_idx_mae, best_max_act_mae))
         
         print(f"Layer {layer_idx}: "
-              f"SAE Unit {best_idx_sae} (Score: {best_score_sae:.4f}, MaxAct: {best_max_act_sae:.4f}), "
-              f"MAE Unit {best_idx_mae} (Score: {best_score_mae:.4f}, MaxAct: {best_max_act_mae:.4f})")
+              f"SAE Unit {best_idx_sae} (Score: {best_score_sae:.6f}, MaxAct: {best_max_act_sae:.6f}), "
+              f"MAE Unit {best_idx_mae} (Score: {best_score_mae:.6f}, MaxAct: {best_max_act_mae:.6f})")
     
     
     if not global_scores_sae:
@@ -331,8 +331,8 @@ def compare_global_best_attribute(num_images_to_visualize=16):
         for s, m in zip(global_scores_sae, global_scores_mae):
              # s = (score, layer, idx, max_act)
             f.write(f"Layer {s[1]:2d}: ")
-            f.write(f"SAE Unit {s[2]:5d} (Score: {s[0]:.4f}, MaxAct: {s[3]:.4f}) | ")
-            f.write(f"MAE Unit {m[2]:5d} (Score: {m[0]:.4f}, MaxAct: {m[3]:.4f})\n")
+            f.write(f"SAE Unit {s[2]:5d} (Score: {s[0]:.6f}, MaxAct: {s[3]:.6f}) | ")
+            f.write(f"MAE Unit {m[2]:5d} (Score: {m[0]:.6f}, MaxAct: {m[3]:.6f})\n")
         
         f.write("\n" + "="*50 + "\n")
         f.write(f"GLOBAL BEST SAE: Layer {best_sae_layer}, Unit {best_sae_idx}\n")
