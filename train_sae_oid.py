@@ -32,8 +32,13 @@ def train_sae_oid():
     print(f"Data loaded. Steps per epoch: {data_loader_size}")
 
     # 2. 保存ディレクトリの準備
-    if not os.path.exists(SAE_WEIGHTS_DIR):
-        os.makedirs(SAE_WEIGHTS_DIR, exist_ok=True)
+    # ディレクトリが存在する場合、上書き防止のために強制終了する
+    if os.path.exists(SAE_WEIGHTS_DIR):
+        print(f"Error: Directory '{SAE_WEIGHTS_DIR}' already exists.")
+        print("Please change 'SAE_WEIGHTS_DIR' in config_oid.py or remove the existing directory.")
+        sys.exit(1) # プログラムを停止
+        
+    os.makedirs(SAE_WEIGHTS_DIR, exist_ok=True)
     
     # 3. モデルの準備
     vit_model = timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE)
