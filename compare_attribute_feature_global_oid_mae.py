@@ -19,6 +19,13 @@ from sae_model import SparseAutoencoder
 from config_oid import * 
 from data_loader_oid import get_openimages_attribute_loaders
 
+import torch
+import numpy as np
+import random
+import time
+
+
+
 # 可視化には一切使わないがモデル引数に必要なのでダミー
 L1_COEFF_DUMMY = 0.0
 
@@ -118,7 +125,7 @@ def compare_global_best_attribute(num_images_to_visualize=9):
     # スコア計算用データ (Pos/Neg 各2000枚)
     print(f"Loading Balanced Attribute Data for Scoring: {TARGET_ATTRIBUTE}")
     dataloader_attr, dataloader_non_attr = get_openimages_attribute_loaders(
-        OID_BASE_DIR, TARGET_ATTRIBUTE, BATCH_SIZE, RANDOM_SEED, None
+        OID_TRAIN_DIR, TARGET_ATTRIBUTE, BATCH_SIZE, RANDOM_SEED, 2000
     )
     
     # 検証用データ (全量)
@@ -139,7 +146,16 @@ def compare_global_best_attribute(num_images_to_visualize=9):
         sae_weight_path = SAE_WEIGHTS_PATH_TEMPLATE.format(layer_idx=layer_idx)
         if not os.path.exists(sae_weight_path):
             continue
-            
+        
+        # --- デバッグ用追加コード ---
+        print(f"DEBUG: Attempting to load SAE from: {sae_weight_path}")
+        if os.path.exists(sae_weight_path):
+            file_stats = os.stat(sae_weight_path)
+            print(f"DEBUG: File found. Size: {file_stats.st_size} bytes, Last Modified: {time.ctime(file_stats.st_mtime)}")
+        else:
+            print(f"DEBUG: !!! FILE NOT FOUND !!! {sae_weight_path}")
+        # ------------------------
+        
         sae_model = SparseAutoencoder(D_MODEL, D_SAE, L1_COEFF_DUMMY).to(DEVICE)
         sae_model.load_state_dict(torch.load(sae_weight_path, map_location=DEVICE))
         sae_model.eval()
@@ -354,6 +370,15 @@ def compare_global_best_attribute(num_images_to_visualize=9):
         f.write("="*50 + "\n")
         
     print(f"Stats saved to: {txt_path}")
+    
+    # --- 追加箇所（分析コード内の最後の方） ---
+    # SAEのTop-9画像のパスを保存する
+    top_paths_to_save = [all_image_paths[idx.item()] for idx in top_idx_sae]
+    paths_txt_path = os.path.join(ANALYSIS_PATH, f"top_images_paths_{TARGET_ATTRIBUTE}.txt")
+    with open(paths_txt_path, 'w') as f:
+        for p in top_paths_to_save:
+            f.write(p + "\n")
+    print(f"Top image paths saved to: {paths_txt_path}")
 
 if __name__ == "__main__":
     compare_global_best_attribute(9)
