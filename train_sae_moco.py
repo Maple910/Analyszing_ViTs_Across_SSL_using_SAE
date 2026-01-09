@@ -1,5 +1,4 @@
-# train_sae_oid.py
-
+# train_sae_moco.py
 import torch
 from torch import amp
 import timm
@@ -11,14 +10,14 @@ import os
 import sys
 import wandb
 
-# configから辞書と基準値をインポート
-from config_oid import * # Hook関数
+# ★変更: config_moco をインポート
+from config_moco import *
 def get_activation(name, activations):
     def hook(model, input, output):
         activations[name] = output.detach()
     return hook
 
-def train_sae_oid():
+def train_sae_moco():
     set_seed(RANDOM_SEED)
 
     # 1. データローダーの準備
@@ -34,29 +33,56 @@ def train_sae_oid():
     print(f"Data loaded. Steps per epoch: {data_loader_size}")
 
     # 2. 保存ディレクトリの準備
-    # ディレクトリが存在する場合、上書き防止のために強制終了する
     if os.path.exists(SAE_WEIGHTS_DIR):
         print(f"Error: Directory '{SAE_WEIGHTS_DIR}' already exists.")
-        print("Please change 'SAE_WEIGHTS_DIR' in config_oid.py or remove the existing directory.")
-        sys.exit(1) # プログラムを停止
+        print("Please change 'SAE_WEIGHTS_DIR' in config_moco.py or remove the existing directory.")
+        sys.exit(1)
         
     os.makedirs(SAE_WEIGHTS_DIR, exist_ok=True)
     
-    # 3. モデルの準備
-    vit_model = timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE)
+    # 3. モデルの準備 (★MoCo v3 ロード部分)
+    print("Loading MoCo v3 Pre-trained ViT...")
+    # まず普通のViTを作成
+    vit_model = timm.create_model("vit_base_patch16_224", pretrained=False).to(DEVICE)
+    
+    # 公式の重みをダウンロード
+    url = "https://dl.fbaipublicfiles.com/moco-v3/vit-b-300ep/vit-b-300ep.pth.tar"
+    checkpoint = torch.hub.load_state_dict_from_url(url, map_location=DEVICE)
+    
+    # チェックポイントのキー構造を確認してロード
+    if 'state_dict' in checkpoint:
+        state_dict = checkpoint['state_dict']
+    elif 'model' in checkpoint:
+        state_dict = checkpoint['model']
+    else:
+        # キーがない場合はcheckpointそのものがstate_dictの可能性あり
+        state_dict = checkpoint
+
+    # 重みのキーを整形 (module.base_encoder. を削除)
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if k.startswith("module.base_encoder."):
+            new_key = k.replace("module.base_encoder.", "")
+            new_state_dict[new_key] = v
+            
+    # ロード実行 (head周りの不一致は無視してOKなので strict=False)
+    msg = vit_model.load_state_dict(new_state_dict, strict=False)
+    print(f"MoCo weights loaded: {msg}")
+    
     vit_model.eval()
     
-    # 4. WandBの初期化 (1回だけ実行)
+    # 4. WandBの初期化
     wandb.init(
         project=WANDB_PROJECT_NAME, 
         entity=WANDB_ENTITY, 
-        name=f"SAE_OID_Train_{SAE_WEIGHTS_DIR}", 
+        name=f"SAE_MoCo_Train_{SAE_WEIGHTS_DIR}", 
         config={
+            "model": "MoCo_v3_ViT_Base", # モデル名を明記
             "dataset": OID_TRAIN_DATASET_NAME,
             "d_model": D_MODEL,
             "d_sae": D_SAE,
-            "base_l1_coeff": BASE_L1_COEFF, # 基準値
-            "l1_coeffs_dict": L1_COEFFS,    # 層ごとの設定全体
+            "base_l1_coeff": BASE_L1_COEFF,
+            "l1_coeffs_dict": L1_COEFFS,
             "ghost_grad_coeff": GHOST_GRAD_COEFF,
             "learning_rate": LEARNING_RATE,
             "batch_size": BATCH_SIZE,
@@ -68,7 +94,6 @@ def train_sae_oid():
     # 5. 層ごとの訓練ループ
     for layer_idx in LAYERS_TO_ANALYZE: 
         
-        # 層ごとのL1係数を取得
         current_l1_coeff = L1_COEFFS.get(layer_idx, BASE_L1_COEFF)
         
         print(f"\nTraining SAE for layer {layer_idx}...")
@@ -85,7 +110,6 @@ def train_sae_oid():
                 for i, (images, _) in enumerate(pbar):
                     images = images.to(DEVICE)
                     
-                    # MAE活性化
                     activations = {}
                     hook_handle = vit_model.blocks[layer_idx].mlp.fc2.register_forward_hook(
                         get_activation(f"layer_{layer_idx}", activations)
@@ -97,16 +121,11 @@ def train_sae_oid():
                     
                     layer_output = activations[f"layer_{layer_idx}"].view(-1, D_MODEL)
                     
-                    # SAE訓練
                     with amp.autocast("cuda"):
                         reconstruction, sae_features = sae_model(layer_output)
-                        
                         reconstruction_loss = F.mse_loss(reconstruction, layer_output)
-                        
-                        # 現在の係数 (current_l1_coeff) を使用
                         l1_loss = current_l1_coeff * torch.sum(torch.abs(sae_features)) / sae_features.shape[0] 
                         
-                        # Ghost Grads
                         sae_features_avg = sae_features.mean(dim=0)
                         ghost_grad_loss = GHOST_GRAD_COEFF * (sae_features_avg < 1e-6).sum()
                         
@@ -118,8 +137,6 @@ def train_sae_oid():
                     scaler.update()
                     
                     total_loss += total_loss_val.item()
-                    
-                    # L0ノルム
                     l0 = (sae_features > 0).float().sum(dim=1).mean().item()
                     
                     with torch.no_grad():
@@ -132,11 +149,8 @@ def train_sae_oid():
                         max=max_act_val
                     )
 
-                    # ログ記録
                     step_in_layer = i + epoch * data_loader_size
-                    
                     wandb.log({
-                        # --- 元のコードにあった項目 (そのまま維持) ---
                         "layer": layer_idx,
                         "epoch": epoch,
                         "total_loss": total_loss_val.item(),
@@ -153,7 +167,6 @@ def train_sae_oid():
                         f"layer_{layer_idx}_l1_coeff": current_l1_coeff, 
                     })
         
-        # 重みの保存
         sae_path = os.path.join(SAE_WEIGHTS_DIR, f"sae_layer_{layer_idx}.pth")
         torch.save(sae_model.state_dict(), sae_path)
         print(f"--> Saved: {sae_path}")
@@ -161,4 +174,4 @@ def train_sae_oid():
     wandb.finish()
 
 if __name__ == "__main__":
-    train_sae_oid()
+    train_sae_moco()
