@@ -37,7 +37,8 @@ import hashlib
 TARGET_ATTRIBUTE = "Microphone"
 
 # 評価対象モデル
-MODELS_TO_EVALUATE = ["MAE", "MoCo", "BEiT", "DINO"] 
+# ★表記を DINO v1, MoCo v3 に変更
+MODELS_TO_EVALUATE = ["MAE", "MoCo v3", "BEiT", "DINO v1"] 
 
 NUM_PATCHES_TO_KEEP = 20  
 # ★修正点: 評価に使う枚数。キャリブレーション(200枚)との重複を避ける。
@@ -57,18 +58,19 @@ POS_DIR = os.path.join(DATASET_ROOT, TARGET_ATTRIBUTE, "positive")
 NEG_DIR = os.path.join(DATASET_ROOT, TARGET_ATTRIBUTE, "negative")
 
 # 各モデルの解析パス設定
+# ★表記を DINO v1, MoCo v3 に変更
 CONFIG_MAP = {
     "MAE": {
         "model_id": "vit_base_patch16_224.mae",
         "stats_path":   f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
         "weights_dir":  f"./data/sae_weights_oid/for_dense_train_50k_each_2_run_11"
     },
-    "MoCo": {
-        "model_id": "vit_base_patch16_224", # 手動ロードが必要
+    "MoCo v3": {
+        "model_id": "vit_base_patch16_224", 
         "stats_path":   f"./data/analysis_moco_normalize/analysis_results_moco_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
         "weights_dir":  f"./data/sae_weights_moco/for_dense_train_50k_each_2_run_1"
     },
-    "DINO": {
+    "DINO v1": {
         "model_id": "vit_base_patch16_224.dino",
         "stats_path":   f"./data/analysis_dino_normalize/analysis_results_dino_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
         "weights_dir":  f"./data/sae_weights_dino/for_dense_train_50k_each_2_run_1"
@@ -140,7 +142,7 @@ def main():
         
         print(f"\n>>> Testing {name} (L{layer} U{unit})")
         
-        if name == "MoCo":
+        if name == "MoCo v3":
             model = timm.create_model(CONFIG_MAP[name]["model_id"], pretrained=False).to(DEVICE)
             url = "https://dl.fbaipublicfiles.com/moco-v3/vit-b-300ep/vit-b-300ep.pth.tar"
             cp = torch.hub.load_state_dict_from_url(url, map_location=DEVICE)
@@ -212,6 +214,7 @@ def main():
             }
             all_results.append(res)
             current_model_results.append(res)
+
 
         # グラフ保存用関数の内部でも浮動小数点として扱うため再度変換
         plot_results = [{**r, "Accuracy": float(r["Accuracy"])} for r in current_model_results]

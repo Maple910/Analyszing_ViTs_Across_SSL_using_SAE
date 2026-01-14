@@ -14,7 +14,6 @@ from tqdm import tqdm
 # ==========================================
 TARGET_ATTRIBUTE = "Microphone"
 
-# 各モデルのパス設定 (run_all_model_ablations.py と同じ形式)
 MAE_PATHS = {
     "stats_path":   f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
     "weights_dir":  f"./data/sae_weights_oid/for_dense_train_50k_each_2_run_11",
@@ -39,7 +38,6 @@ BEIT_PATHS = {
     "image_list":   f"./data/analysis_beit_normalize/analysis_results_beit_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/top_images_paths_{TARGET_ATTRIBUTE}.txt"
 }
 
-# 消去するパッチの最大数
 MAX_PATCHES_TO_DELETE = 15
 SAVE_DIR = f"./data/analysis_comparison_ablations/mae11_moco1_dino1_beit1/{TARGET_ATTRIBUTE}/curves"
 
@@ -54,10 +52,11 @@ def parse_unit(path):
         return (int(m.group(1)), int(m.group(2))) if m else (None, None)
 
 def load_backbone(m_type):
-    if m_type == "MAE":  return timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE).eval()
-    if m_type == "DINO": return timm.create_model("vit_base_patch16_224.dino", pretrained=True).to(DEVICE).eval()
-    if m_type == "BEiT": return timm.create_model("beit_base_patch16_224", pretrained=True).to(DEVICE).eval()
-    if m_type == "MoCo":
+    m_lower = m_type.lower()
+    if "mae" in m_lower:  return timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE).eval()
+    if "dino" in m_lower: return timm.create_model("vit_base_patch16_224.dino", pretrained=True).to(DEVICE).eval()
+    if "beit" in m_lower: return timm.create_model("beit_base_patch16_224", pretrained=True).to(DEVICE).eval()
+    if "moco" in m_lower:
         model = timm.create_model("vit_base_patch16_224", pretrained=False).to(DEVICE)
         cp = torch.hub.load_state_dict_from_url("https://dl.fbaipublicfiles.com/moco-v3/vit-b-300ep/vit-b-300ep.pth.tar", map_location=DEVICE)
         sd = cp.get('state_dict', cp.get('model', cp))
@@ -65,7 +64,6 @@ def load_backbone(m_type):
         model.load_state_dict(nsd, strict=False); return model.eval()
 
 def get_deletion_curve(model, sae, img_tensor, layer, unit_id):
-    """重要なパッチから順に消していき、活性の変化を記録する"""
     activations = {}
     handle = model.blocks[layer].mlp.fc2.register_forward_hook(lambda m, i, o: activations.update({'f': o.detach()}))
     
@@ -74,7 +72,6 @@ def get_deletion_curve(model, sae, img_tensor, layer, unit_id):
         _, f = sae(activations['f'][:, 1:, :].reshape(-1, 768))
         f_patch = f.view(196, -1)[:, unit_id]
         
-    # 活性が高い順にパッチインデックスを並べる
     sorted_indices = torch.argsort(f_patch, descending=True).cpu().numpy()
     
     curve = []
@@ -93,7 +90,6 @@ def get_deletion_curve(model, sae, img_tensor, layer, unit_id):
             temp_img[:, :, gy*16:(gy+1)*16, gx*16:(gx+1)*16] = 0
             
     handle.remove()
-    # 最初の値を100%として正規化
     base = curve[0] + 1e-8
     return [c / base * 100 for c in curve]
 
@@ -101,8 +97,9 @@ def main():
     os.makedirs(SAVE_DIR, exist_ok=True)
     tr = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
     
-    tasks = [("MAE", MAE_PATHS, "#1f77b4", "o"), ("MoCo", MOCO_PATHS, "#ff7f0e", "s"), 
-             ("BEiT", BEIT_PATHS, "#2ca02c", "^"), ("DINO", DINO_PATHS, "#d62728", "D")]
+    # ★モデル表記を DINO v1, MoCo v3 に変更
+    tasks = [("MAE", MAE_PATHS, "#1f77b4", "o"), ("MoCo v3", MOCO_PATHS, "#ff7f0e", "s"), 
+             ("BEiT", BEIT_PATHS, "#2ca02c", "^"), ("DINO v1", DINO_PATHS, "#d62728", "D")]
 
     plt.figure(figsize=(10, 6))
     
@@ -113,11 +110,12 @@ def main():
         
         model = load_backbone(name)
         sae = SparseAutoencoder(768, 768 * 32, 0.0).to(DEVICE)
-        sae.load_state_dict(torch.load(os.path.join(paths["weights_dir"], f"sae_layer_{layer}.pth"), map_location=DEVICE))
+        sae_path = os.path.join(paths["weights_dir"], f"sae_layer_{layer}.pth")
+        sae.load_state_dict(torch.load(sae_path, map_location=DEVICE))
         sae.eval()
 
         with open(paths["image_list"], 'r') as f:
-            img_paths = [l.strip() for l in f.readlines() if l.strip()][:5] # 上位5枚で平均を取る
+            img_paths = [l.strip() for l in f.readlines() if l.strip()][:5] 
 
         all_curves = []
         for p in img_paths:

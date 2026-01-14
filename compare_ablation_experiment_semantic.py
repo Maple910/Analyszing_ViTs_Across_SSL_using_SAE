@@ -14,19 +14,20 @@ from tqdm import tqdm
 # ★設定項目：4モデルのパスをそれぞれ指定してください
 # ==========================================
 TARGET_ATTRIBUTE = "Microphone"
-# 比較する送信パッチ数（全体196パッチのうち、何個残すか）
 PATCH_COUNTS = [1, 2, 5, 10, 20, 50, 100, 150, 196] 
 
 
 # 論文用：統一カラー＆マーカー設定
+# ★キーを MoCo v3, DINO v1 に変更
 MODEL_STYLES = {
-    "MAE":  {"color": "#1f77b4", "marker": "o"},
-    "MOCO": {"color": "#ff7f0e", "marker": "s"},
-    "BEIT": {"color": "#2ca02c", "marker": "^"},
-    "DINO": {"color": "#d62728", "marker": "D"}
+    "MAE":      {"color": "#1f77b4", "marker": "o"},
+    "MOCO V3":  {"color": "#ff7f0e", "marker": "s"},
+    "BEIT":     {"color": "#2ca02c", "marker": "^"},
+    "DINO V1":  {"color": "#d62728", "marker": "D"}
 }
 
 
+# ★キーを MoCo v3, DINO v1 に変更
 CONFIG_MAP = {
     "MAE" : {
     "stats_path":   f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
@@ -34,27 +35,26 @@ CONFIG_MAP = {
     "image_list":   f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11/top_images_paths_{TARGET_ATTRIBUTE}.txt"
     },
 
-    "MOCO" : {
+    "MoCo v3" : {
     "stats_path":   f"./data/analysis_moco_normalize/analysis_results_moco_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
     "weights_dir":  f"./data/sae_weights_moco/for_dense_train_50k_each_2_run_1",
     "image_list":   f"./data/analysis_moco_normalize/analysis_results_moco_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/top_images_paths_{TARGET_ATTRIBUTE}.txt"
     },
 
-    "DINO" : 
+    "BEiT" : {
+    "stats_path":   f"./data/analysis_beit_normalize/analysis_results_beit_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
+    "weights_dir":  f"./data/sae_weights_beit/for_dense_train_50k_each_2_run_1",
+    "image_list":   f"./data/analysis_beit_normalize/analysis_results_beit_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/top_images_paths_{TARGET_ATTRIBUTE}.txt"
+    },
+    
+    "DINO v1" : 
     {
     "stats_path":   f"./data/analysis_dino_normalize/analysis_results_dino_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
     "weights_dir":  f"./data/sae_weights_dino/for_dense_train_50k_each_2_run_1",
     "image_list":   f"./data/analysis_dino_normalize/analysis_results_dino_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/top_images_paths_{TARGET_ATTRIBUTE}.txt"
-    },
-
-    "BEIT" : {
-    "stats_path":   f"./data/analysis_beit_normalize/analysis_results_beit_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
-    "weights_dir":  f"./data/sae_weights_beit/for_dense_train_50k_each_2_run_1",
-    "image_list":   f"./data/analysis_beit_normalize/analysis_results_beit_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/top_images_paths_{TARGET_ATTRIBUTE}.txt"
     }
 }
 
-# 保存先ディレクトリ
 SAVE_DIR = f"./data/analysis_comparison_ablations/mae11_moco1_dino1_beit1/{TARGET_ATTRIBUTE}/applied_results_compression"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # ==========================================
@@ -68,10 +68,10 @@ def parse_best_info(path):
 def load_backbone(m_type):
     m_type_upper = m_type.upper()
     try:
-        if m_type_upper == "MAE": return timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE).eval()
-        elif m_type_upper == "DINO": return timm.create_model("vit_base_patch16_224.dino", pretrained=True).to(DEVICE).eval()
-        elif m_type_upper == "BEIT": return timm.create_model("beit_base_patch16_224", pretrained=True).to(DEVICE).eval()
-        elif m_type_upper == "MOCO":
+        if "MAE" in m_type_upper: return timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE).eval()
+        elif "DINO" in m_type_upper: return timm.create_model("vit_base_patch16_224.dino", pretrained=True).to(DEVICE).eval()
+        elif "BEIT" in m_type_upper: return timm.create_model("beit_base_patch16_224", pretrained=True).to(DEVICE).eval()
+        elif "MOCO" in m_type_upper:
             model = timm.create_model("vit_base_patch16_224", pretrained=False).to(DEVICE)
             url = "https://dl.fbaipublicfiles.com/moco-v3/vit-b-300ep/vit-b-300ep.pth.tar"
             cp = torch.hub.load_state_dict_from_url(url, map_location=DEVICE)
@@ -131,10 +131,10 @@ def main():
         if not compression_curves: continue
         avg_curve = np.mean(compression_curves, axis=0)
         
-        # ★統一されたスタイル（色・点）を使用
         style = MODEL_STYLES.get(name.upper(), {"color": None, "marker": "o"})
         plt.plot(PATCH_COUNTS, avg_curve, label=name, color=style["color"], marker=style["marker"], linewidth=2, markersize=6)
         
+        # CSV用のデータ作成
         res_entry = {"Model": name}
         for idx, count in enumerate(PATCH_COUNTS): res_entry[f"Patch_{count}_%"] = round(avg_curve[idx], 2)
         all_model_data.append(res_entry)

@@ -32,7 +32,7 @@ import random
 # ==========================================
 # ★設定項目
 # ==========================================
-TARGET_ATTRIBUTE = "Microphone"
+TARGET_ATTRIBUTE = "Chair"
 
 # 閾値を決めるための「キャリブレーション用」の枚数（各クラス200枚ずつ、計400枚を使用）
 NUM_CALIB_SAMPLES = 200 
@@ -45,18 +45,19 @@ POS_DIR = os.path.join(DATASET_ROOT, TARGET_ATTRIBUTE, "positive")
 NEG_DIR = os.path.join(DATASET_ROOT, TARGET_ATTRIBUTE, "negative")
 
 # 各モデルの解析パス設定
+# ★表記を DINO v1, MoCo v3 に変更
 CONFIG_MAP = {
     "MAE": {
         "model_id": "vit_base_patch16_224.mae",
         "stats_path":   f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
         "weights_dir":  f"./data/sae_weights_oid/for_dense_train_50k_each_2_run_11"
     },
-    "MoCo": {
-        "model_id": "vit_base_patch16_224", # 手動ロードが必要
+    "MoCo v3": {
+        "model_id": "vit_base_patch16_224", 
         "stats_path":   f"./data/analysis_moco_normalize/analysis_results_moco_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
         "weights_dir":  f"./data/sae_weights_moco/for_dense_train_50k_each_2_run_1"
     },
-    "DINO": {
+    "DINO v1": {
         "model_id": "vit_base_patch16_224.dino",
         "stats_path":   f"./data/analysis_dino_normalize/analysis_results_dino_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
         "weights_dir":  f"./data/sae_weights_dino/for_dense_train_50k_each_2_run_1"
@@ -133,7 +134,7 @@ def main():
         layer, unit = parse_best_unit(config["stats_path"])
         if layer is None: continue
             
-        if name == "MoCo":
+        if name == "MoCo v3":
             model = timm.create_model(config["model_id"], pretrained=False).to(DEVICE)
             url = "https://dl.fbaipublicfiles.com/moco-v3/vit-b-300ep/vit-b-300ep.pth.tar"
             cp = torch.hub.load_state_dict_from_url(url, map_location=DEVICE)

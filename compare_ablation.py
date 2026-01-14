@@ -16,10 +16,6 @@ from tqdm import tqdm
 TARGET_ATTRIBUTE = "Microphone"
 
 # 2. 各モデルのパス設定
-# stats_path   : "GLOBAL BEST SAE: Layer X, Unit Y" が記載された統計ファイル
-# weights_dir  : SAEの重みファイル（sae_layer_0.pth 〜 sae_layer_11.pth）が格納されているディレクトリ
-# image_list   : 解析対象とする画像パスが並んだテキストファイル
-
 MAE_PATHS = {
     "stats_path":   f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11/global_best_{TARGET_ATTRIBUTE}_stats_full.txt",
     "weights_dir":  f"./data/sae_weights_oid/for_dense_train_50k_each_2_run_11",
@@ -58,7 +54,6 @@ def parse_unit_from_file(stats_path):
     with open(stats_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    # フォーマット「GLOBAL BEST SAE: Layer X, Unit Y」を検索
     match = re.search(r"GLOBAL BEST SAE: Layer (\d+), Unit (\d+)", content)
     if match:
         return int(match.group(1)), int(match.group(2))
@@ -67,13 +62,15 @@ def parse_unit_from_file(stats_path):
 def load_backbone(model_type):
     """各手法のバックボーンをロード"""
     print(f"Loading {model_type} backbone...")
-    if model_type == "MAE":
+    # 表記の揺れに対応
+    m_lower = model_type.lower()
+    if "mae" in m_lower:
         return timm.create_model("vit_base_patch16_224.mae", pretrained=True).to(DEVICE).eval()
-    elif model_type == "DINO":
+    elif "dino" in m_lower:
         return timm.create_model("vit_base_patch16_224.dino", pretrained=True).to(DEVICE).eval()
-    elif model_type == "BEiT":
+    elif "beit" in m_lower:
         return timm.create_model("beit_base_patch16_224", pretrained=True).to(DEVICE).eval()
-    elif model_type == "MoCo":
+    elif "moco" in m_lower:
         model = timm.create_model("vit_base_patch16_224", pretrained=False).to(DEVICE)
         url = "https://dl.fbaipublicfiles.com/moco-v3/vit-b-300ep/vit-b-300ep.pth.tar"
         checkpoint = torch.hub.load_state_dict_from_url(url, map_location=DEVICE)
@@ -88,13 +85,11 @@ def run_ablation(model_name, paths_dict):
     weights_dir = paths_dict["weights_dir"]
     images_p = paths_dict["image_list"]
 
-    # 1. ユニット情報の取得 (Layer番号を取得)
     layer, unit_id = parse_unit_from_file(stats_p)
     if layer is None:
         print(f" [Error] {model_name} の統計ファイルからユニット情報を読み取れませんでした: {stats_p}")
         return None, None
     
-    # ★修正箇所: Layer番号に基づいてファイル名を生成
     weights_p = os.path.join(weights_dir, f"sae_layer_{layer}.pth")
     
     if not os.path.exists(weights_p):
@@ -105,13 +100,11 @@ def run_ablation(model_name, paths_dict):
         print(f" [Error] {model_name} の画像リストファイルが存在しません: {images_p}")
         return None, None
 
-    # 2. モデルとSAEのロード
     vit = load_backbone(model_name)
     sae = SparseAutoencoder(768, 768 * 32, 0.0).to(DEVICE)
     sae.load_state_dict(torch.load(weights_p, map_location=DEVICE))
     sae.eval()
 
-    # 画像パスの読み込み
     with open(images_p, 'r', encoding='utf-8') as f:
         img_paths = [l.strip() for l in f.readlines() if l.strip()][:9]
 
@@ -131,25 +124,21 @@ def run_ablation(model_name, paths_dict):
             continue
 
         with torch.no_grad():
-            # オリジナルの最大活性
             vit(img_t)
             _, f_all = sae(acts['f'][:, 1:, :].reshape(-1, 768)) 
             f_patch = f_all.view(196, -1)[:, unit_id]
             orig_max = f_patch.max().item()
             if orig_max < 1e-6: continue
             
-            # 最大パッチ特定と消去
             max_idx = torch.argmax(f_patch).item()
             grid_y, grid_x = divmod(max_idx, 14)
             abl_t = img_t.clone()
             abl_t[:, :, grid_y*16:(grid_y+1)*16, grid_x*16:(grid_x+1)*16] = 0
             
-            # 再推論
             vit(abl_t)
             _, f_abl_all = sae(acts['f'][:, 1:, :].reshape(-1, 768))
             abl_max = f_abl_all.view(196, -1)[:, unit_id].max().item()
             
-            # 減少率計算
             drop = (orig_max - abl_max) / (orig_max + 1e-8) * 100
             drops.append(max(0, drop))
     
@@ -161,11 +150,12 @@ def main():
     os.makedirs(SAVE_DIR, exist_ok=True)
     report_file = os.path.join(SAVE_DIR, f"ablation_report_{TARGET_ATTRIBUTE}.txt")
 
+    # ★モデル表記を DINO v1, MoCo v3 に変更
     tasks = [
-        ("MAE",  MAE_PATHS),
-        ("MoCo", MOCO_PATHS),
-        ("DINO", DINO_PATHS),
-        ("BEiT", BEIT_PATHS)
+        ("MAE",      MAE_PATHS),
+        ("MoCo v3",  MOCO_PATHS),
+        ("BEiT",     BEIT_PATHS),
+        ("DINO v1",  DINO_PATHS)
     ]
 
     print(f"\n{'='*60}\n SSL Model Ablation Analysis (Manual Dir Mode): {TARGET_ATTRIBUTE}\n{'='*60}")
