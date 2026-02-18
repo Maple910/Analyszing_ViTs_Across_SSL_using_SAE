@@ -1,4 +1,5 @@
-# config_dino.py
+# DINO用設定
+
 import torch
 import os
 
@@ -13,7 +14,6 @@ D_MODEL = 768
 D_SAE = D_MODEL * 32
 GHOST_GRAD_COEFF = 1e-4
 
-# MoCoの設定（3e-3 + 5e-4）と完全に一致させる（公平な比較のため）
 BASE_L1_COEFF = 3e-3 + 5e-4
 
 # MoCoの設定からそのまま引き継ぎ

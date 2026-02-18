@@ -1,3 +1,5 @@
+# CelebA用設定
+
 import torch
 import os
 

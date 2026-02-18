@@ -1,4 +1,5 @@
-# config_beit.py
+# BEiT用設定
+
 import torch
 import os
 
@@ -14,7 +15,6 @@ D_SAE = D_MODEL * 32
 GHOST_GRAD_COEFF = 1e-4
 
 # BEiTの活性化スケールに最適化したL1係数
-# 4e-4 前後が、デッドニューロンを抑えつつ解釈性を担保するのに適しています
 BASE_L1_COEFF = 4e-4
 
 L1_COEFFS = {

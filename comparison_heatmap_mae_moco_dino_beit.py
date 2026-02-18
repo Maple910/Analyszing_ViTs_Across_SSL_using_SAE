@@ -1,3 +1,5 @@
+# OIDでMAE,DINO，BEIT，MoCoでヒートマップ可視化
+
 import os
 import re
 import torch
@@ -21,16 +23,39 @@ import config_dino as cfg_dino    # DINO
 # ==========================================
 # ★設定項目（環境に合わせて書き換えてください）
 # ==========================================
-TARGET_ATTRIBUTE = "Mobile_phone" # 比較したい属性名
+
+# ==========================================
+# 特徴一覧
+"""
+    "Person",
+    "Car",
+    "Guitar",
+    "Table",
+    "Mobile_phone",
+    "Bird",
+    "Sunglasses",
+    "Tree",
+    "Building",
+    "Chair",
+    "Microphone"
+"""
+# ==========================================
+
+TARGET_ATTRIBUTE = "Microphone"
 
 # 各モデルの分析結果（stats_full.txt）があるディレクトリ
+# このコードを実行する前に各モデルごとの可視化(compare_attribute_normalization~~)を実行しておく必要がある
 MAE_DIR   = f"./data/analysis_oid_normalize/analysis_results_oid_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_11"
 MOCO_DIR  = f"./data/analysis_moco_normalize/analysis_results_moco_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1"
 BEIT_DIR  = f"./data/analysis_beit_normalize/analysis_results_beit_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1"
 DINO_DIR  = f"./data/analysis_dino_normalize/analysis_results_dino_{TARGET_ATTRIBUTE}/for_dense_train_50k_each_2_run_1"
 
+# ヒートマップ可視化を行う際どのモデルで可視化した画像群を用いるかを選択する
+TARGET_DIR = DINO_DIR
+TARGET_MODEL = "DINO"
+
 # 比較画像の保存先
-SAVE_DIR = "./data/analysis_comparison_heatmaps/mae_moco_dino_beit/mae11_moco1_beit1_dino1"
+SAVE_DIR = f"./data/analysis_comparison_heatmaps/mae_moco_dino_beit/mae11_moco1_beit1_dino1/{TARGET_ATTRIBUTE}"
 # ==========================================
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -140,7 +165,7 @@ def main():
 
     # 3. 画像パスの取得（MAEの解析結果にあるパスリストを使用）
     # ※パスリストが見つからない場合は MAE_DIR 直下などを確認してください
-    paths_txt = glob.glob(os.path.join(BEIT_DIR, "**", f"top_images_paths_{TARGET_ATTRIBUTE}.txt"), recursive=True)
+    paths_txt = glob.glob(os.path.join(TARGET_DIR, "**", f"top_images_paths_{TARGET_ATTRIBUTE}.txt"), recursive=True)
     if not paths_txt:
         print("[ERROR] Paths file not found."); return
     with open(paths_txt[0], 'r') as f:
@@ -177,7 +202,7 @@ def main():
 
     plt.suptitle(f"SAE Feature Comparison (2x2 Layout) - Attribute: '{TARGET_ATTRIBUTE}'\n[Top-Left: MAE, Top-Right: MoCo, Bottom-Left: BEiT, Bottom-Right: DINO]", fontsize=20)
     
-    save_path = os.path.join(SAVE_DIR, f"heatmap_comparison_4models_{TARGET_ATTRIBUTE}.png")
+    save_path = os.path.join(SAVE_DIR, f"heatmap_comparison_4models_{TARGET_ATTRIBUTE}_{TARGET_MODEL}.png")
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
     print(f"\n[Success] Comparison heatmap saved to: {save_path}")

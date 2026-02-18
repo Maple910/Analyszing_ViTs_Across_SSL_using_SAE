@@ -1,3 +1,5 @@
+# 指定した特徴群（TRAGET_ATTRIBUTES）に対して可視化を行う（MoCo用）
+
 import os
 import subprocess
 import re

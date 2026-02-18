@@ -1,4 +1,5 @@
-# config_moco.py
+# MoCo用設定
+
 import torch
 import os
 
@@ -11,7 +12,6 @@ D_MODEL = 768 # ViT Base
 D_SAE = D_MODEL * 32
 GHOST_GRAD_COEFF = 1e-4
 
-# MAEで成功した係数設定をそのまま使用 (公平な比較のため)
 BASE_L1_COEFF = 3e-3 + 5e-4
 
 L1_COEFFS = {

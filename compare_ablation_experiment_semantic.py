@@ -1,3 +1,5 @@
+# 活性化維持率（AMR）を計算，グラフ生成，csv作成
+
 import os
 import re
 import torch

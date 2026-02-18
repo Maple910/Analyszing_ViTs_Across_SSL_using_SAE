@@ -1,4 +1,5 @@
-# config_oid.py
+# MAE，OpenImageDataset用設定
+
 import torch
 import os
 
